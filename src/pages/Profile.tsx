@@ -3,8 +3,9 @@ import { HeightInput, WeightInput } from '../components/MeasureInputs';
 import { todayISO } from '../lib/dates';
 import { activityFactor, activityLabel, bmr, LIFESTYLES, TRAINING_TYPES } from '../lib/nutrition';
 import { DEFAULT_PROFILE, useStore } from '../lib/store';
-import { computePlan } from '../lib/targets';
-import type { HeightUnit, Lifestyle, Profile as ProfileT, TrainingType, WeightUnit } from '../lib/types';
+import { DAY_LOADS, LOAD_ORDER, WEEKDAYS, dayTargets } from '../lib/carbPlan';
+import { computePlan, suggestedWaterMl } from '../lib/targets';
+import type { DayLoad, HeightUnit, Lifestyle, Profile as ProfileT, TrainingType, WeightUnit } from '../lib/types';
 import { formatWeight } from '../lib/units';
 
 export function Profile({ onboarding = false, onDone, onOpenSettings }: { onboarding?: boolean; onDone?: () => void; onOpenSettings?: () => void }) {
@@ -118,6 +119,56 @@ export function Profile({ onboarding = false, onDone, onOpenSettings }: { onboar
         <p className="faint">
           Log your steps each day in the Diary. Steps above ~{lifestyle.baselineSteps.toLocaleString('en-GB')} count as extra burn
           (~{Math.round(1000 * kg * 0.0005)} kcal per 1,000 steps at your weight).
+        </p>
+      </div>
+
+      <div className="card">
+        <h2>Training-day carb plan</h2>
+        <label className="row">
+          <input type="checkbox" checked={p.carbCycling} onChange={(e) => set('carbCycling', e.target.checked)} />
+          <span>Adjust carbs to my training (more on hard days, less on rest days)</span>
+        </label>
+        <p className="faint">Protein and fat stay the same; your weekly calories don’t change, so your weight-loss rate stays on track. You can change any single day from the Diary.</p>
+        {p.carbCycling && (
+          <table className="list">
+            <tbody>
+              {WEEKDAYS.map((day, i) => {
+                const load = p.trainingWeek[i] ?? 'rest';
+                const t = plan ? dayTargets(p, plan.targets, load) : null;
+                return (
+                  <tr key={day}>
+                    <td style={{ width: 44 }}><strong>{day}</strong></td>
+                    <td>
+                      <select
+                        aria-label={`${day} training`}
+                        value={load}
+                        onChange={(e) => set('trainingWeek', p.trainingWeek.map((l, j) => (j === i ? (e.target.value as DayLoad) : l)))}
+                      >
+                        {LOAD_ORDER.map((l) => <option key={l} value={l}>{DAY_LOADS[l].label}</option>)}
+                      </select>
+                    </td>
+                    <td className="num faint" style={{ width: 96, fontSize: 12 }}>
+                      {t ? `${Math.round(t.carbs)} g carbs · ${Math.round(t.kcal)} kcal` : ''}
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        )}
+      </div>
+
+      <div className="card">
+        <h2>Water</h2>
+        <label className="field">
+          <span>Daily water goal (ml)</span>
+          <input type="number" inputMode="numeric" step={250} min={0} value={p.waterGoalMl} onChange={(e) => set('waterGoalMl', Math.max(0, Number(e.target.value)))} />
+        </label>
+        <p className="faint" style={{ marginBottom: 0 }}>
+          Suggested for your weight: about {(suggestedWaterMl(kg) / 1000).toFixed(2)} L a day from drinks, plus more on hot or training days.{' '}
+          {p.waterGoalMl !== suggestedWaterMl(kg) && (
+            <button className="btn ghost small" style={{ padding: 0 }} onClick={() => set('waterGoalMl', suggestedWaterMl(kg))}>Use suggestion</button>
+          )}
         </p>
       </div>
 

@@ -1,5 +1,5 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from 'react';
-import type { AppData, DiaryEntry, ExerciseEntry, Food, Profile, Recipe, SavedMeal, WeightEntry } from './types';
+import type { AppData, DayLoad, DiaryEntry, ExerciseEntry, Food, Profile, Recipe, SavedMeal, WeightEntry } from './types';
 
 const KEY = 'macro-counter:v1';
 
@@ -15,7 +15,17 @@ const EMPTY: AppData = {
   savedMeals: [],
   recipes: [],
   steps: {},
+  water: {},
+  dayLoads: {},
 };
+
+/** Spread n training days sensibly across Mon–Sun. */
+export function defaultTrainingWeek(n: number): DayLoad[] {
+  const order = [0, 2, 4, 5, 1, 3, 6]; // Mon, Wed, Fri, Sat, Tue, Thu, Sun
+  const week: DayLoad[] = Array(7).fill('rest');
+  for (const d of order.slice(0, Math.max(0, Math.min(7, n)))) week[d] = 'moderate';
+  return week;
+}
 
 export const DEFAULT_PROFILE: Profile = {
   name: '',
@@ -28,6 +38,9 @@ export const DEFAULT_PROFILE: Profile = {
   workoutMinutes: 45,
   trainingType: 'mixed',
   dailyStepGoal: 10000,
+  waterGoalMl: 2500,
+  carbCycling: false,
+  trainingWeek: defaultTrainingWeek(3),
   weightUnit: 'st',
   goalKg: 75,
   rateKgPerWeek: -0.5,
@@ -51,6 +64,7 @@ export function migrate(raw: Partial<AppData>): AppData {
   if (d.profile) {
     const legacy = (d.profile as Profile & { activity?: string }).activity;
     d.profile = { ...DEFAULT_PROFILE, ...(legacy ? LEGACY_ACTIVITY[legacy] : {}), ...d.profile, heightUnit: d.profile.heightUnit ?? 'cm' };
+    if (!(raw.profile as Partial<Profile>).trainingWeek) d.profile.trainingWeek = defaultTrainingWeek(d.profile.workoutsPerWeek);
     delete (d.profile as Profile & { activity?: string }).activity;
   }
   return d;
@@ -94,6 +108,8 @@ interface Store {
   saveRecipe(r: Recipe): void;
   removeRecipe(id: string): void;
   setSteps(date: string, steps: number | null): void;
+  addWater(date: string, ml: number): void;
+  setDayLoad(date: string, load: DayLoad | null): void;
   replaceAll(d: AppData): void;
 }
 
@@ -147,6 +163,14 @@ export function StoreProvider({ children }: { children: ReactNode }) {
           if (steps === null) delete next[date];
           else next[date] = steps;
           return { ...d, steps: next };
+        }),
+      addWater: (date, ml) => setData((d) => ({ ...d, water: { ...d.water, [date]: Math.max(0, (d.water[date] ?? 0) + ml) } })),
+      setDayLoad: (date, load) =>
+        setData((d) => {
+          const next = { ...d.dayLoads };
+          if (load === null) delete next[date];
+          else next[date] = load;
+          return { ...d, dayLoads: next };
         }),
       replaceAll: (d) => setData(migrate(d)),
     }),

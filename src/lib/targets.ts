@@ -1,4 +1,5 @@
 import { estimateExpenditure, calorieTargetForRate, exerciseForDate, macroTargets, stepCalories, weightTrend, type Targets, type ExpenditureEstimate } from './nutrition';
+import { dayTargets, loadForDate, type DayTargets } from './carbPlan';
 import type { AppData } from './types';
 
 export interface DayPlan {
@@ -31,4 +32,14 @@ export function burnForDate(data: AppData, date: string, kg: number): DayBurn {
   const steps = data.steps[date] ?? null;
   const stepKcal = steps !== null && data.profile ? Math.max(0, stepCalories(data.profile, steps, kg)) : 0;
   return { workouts, steps, stepKcal, total: workouts + stepKcal };
+}
+
+/** The plan's targets adjusted for a specific date's training load (carb plan). */
+export function targetsForDate(data: AppData, plan: DayPlan, date: string): DayTargets {
+  return dayTargets(data.profile!, plan.targets, loadForDate(data, date));
+}
+
+/** Suggested daily water: ~35 ml per kg, rounded to 250 ml, within 1.5–4 L. */
+export function suggestedWaterMl(kg: number): number {
+  return Math.min(4000, Math.max(1500, Math.round((kg * 35) / 250) * 250));
 }

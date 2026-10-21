@@ -1,3 +1,4 @@
+import { dayTargets, weekdayIndex } from './carbPlan';
 import { addDays } from './dates';
 import { activityFactor, bmr, calorieTargetForRate, recipeToFood, stepCalories, daysToGoal, estimateExpenditure, formulaTdee, KCAL_PER_KG, macroTargets, projectWeight, weightTrend } from './nutrition';
 import { migrate } from './store';
@@ -5,7 +6,7 @@ import type { DiaryEntry, Profile, Recipe, WeightEntry } from './types';
 import { formatWeight, stLbToKg } from './units';
 
 const profile: Profile = {
-  name: '', heightUnit: 'cm', lifestyle: 'mixed', workoutsPerWeek: 3, workoutMinutes: 60, trainingType: 'mixed', dailyStepGoal: 10000,
+  name: '', heightUnit: 'cm', lifestyle: 'mixed', workoutsPerWeek: 3, workoutMinutes: 60, trainingType: 'mixed', dailyStepGoal: 10000, waterGoalMl: 2500, carbCycling: false, trainingWeek: ['rest', 'rest', 'rest', 'rest', 'rest', 'rest', 'rest'],
   sex: 'male', age: 35, heightCm: 180, weightUnit: 'kg', goalKg: 80,
   rateKgPerWeek: -0.5, proteinGPerKg: 2, fatPct: 30, eatBackExercise: false, calorieOverride: null,
 };
@@ -133,5 +134,27 @@ describe('migrate', () => {
     expect(d.profile!.heightUnit).toBe('cm');
     expect(d.recipes).toEqual([]);
     expect('activity' in d.profile!).toBe(false);
+  });
+});
+
+describe('carb plan', () => {
+  const base = { kcal: 2200, protein: 160, carbs: 230, fat: 73 };
+  const p: Profile = { ...profile, carbCycling: true, trainingWeek: ['hard', 'rest', 'moderate', 'rest', 'moderate', 'hard', 'light'] };
+
+  it('keeps the weekly calorie average unchanged', () => {
+    const week = p.trainingWeek.map((l) => dayTargets(p, base, l));
+    const avgKcal = week.reduce((s, t) => s + t.kcal, 0) / 7;
+    expect(avgKcal).toBeCloseTo(2200);
+    expect(week[0].carbs).toBeGreaterThan(week[1].carbs);
+    expect(week[0].protein).toBe(160);
+  });
+
+  it('is a no-op when switched off', () => {
+    expect(dayTargets({ ...p, carbCycling: false }, base, 'hard').carbs).toBe(230);
+  });
+
+  it('maps dates to Monday-first weekdays', () => {
+    expect(weekdayIndex('2026-10-19')).toBe(0); // Monday
+    expect(weekdayIndex('2026-10-25')).toBe(6); // Sunday
   });
 });

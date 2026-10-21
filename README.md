@@ -26,6 +26,10 @@ All data is stored on the device (export/import a JSON backup from Settings).
   extra burn (~0.0005 kcal per step per kg).
 - **Exercise logging** with MET-based estimates or manual calories from your watch; optionally
   add exercise and step calories to your budget.
+- **Water** – daily goal (suggested from your weight) with one-tap glass / bottle / pint buttons.
+- **Training-day carb plan** – Hexis-style carb periodisation. Set each weekday as rest / light /
+  moderate / hard; carbs rise on hard days and drop on rest days while protein, fat and the weekly
+  calorie total stay the same. Override any single day from the diary, with fuelling tips per day.
 - **Weight trend** – exponentially smoothed trend line so daily water swings don't mislead you.
   Units: stones & pounds, lb, or kg.
 - **Adaptive expenditure** – after ~1–3 weeks of logging, your real maintenance calories are
@@ -44,11 +48,17 @@ npm run build      # production build in dist/
 
 ## Adding the full CoFID database
 
-1. Download the CoFID Excel workbook from
-   <https://www.gov.uk/government/publications/composition-of-foods-integrated-dataset-cofid>.
-2. `npm run import:cofid -- path/to/CoFID.xlsx`
+```bash
+npm run fetch:uk-foods
+```
 
-This writes `src/data/cofid.json`, which the app lazy-loads into search automatically.
+Downloads the latest CoFID workbook from GOV.UK (finding it via the GOV.UK Content API) and writes
+`src/data/cofid.json`, which the app lazy-loads into search automatically. Needs access to
+`www.gov.uk` and `assets.publishing.service.gov.uk`.
+
+Offline alternative: download the Excel workbook from
+<https://www.gov.uk/government/publications/composition-of-foods-integrated-dataset-cofid> and run
+`npm run import:cofid -- path/to/CoFID.xlsx`.
 
 ## How the maths works
 

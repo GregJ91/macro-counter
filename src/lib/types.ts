@@ -58,6 +58,8 @@ export type HeightUnit = 'cm' | 'ftin';
 /** Day-to-day movement outside of deliberate exercise. */
 export type Lifestyle = 'desk' | 'mixed' | 'feet' | 'manual';
 export type TrainingType = 'strength' | 'cardio' | 'mixed' | 'sport';
+/** How demanding a day's training is — drives the carb plan. */
+export type DayLoad = 'rest' | 'light' | 'moderate' | 'hard';
 
 export interface Profile {
   name: string;
@@ -70,6 +72,11 @@ export interface Profile {
   workoutMinutes: number;
   trainingType: TrainingType;
   dailyStepGoal: number;
+  waterGoalMl: number;
+  /** Shift carbs towards training days, keeping the weekly calorie average the same. */
+  carbCycling: boolean;
+  /** Planned load for Monday … Sunday. */
+  trainingWeek: DayLoad[];
   weightUnit: WeightUnit;
   goalKg: number;
   /** Planned change per week in kg; negative = loss. */
@@ -116,4 +123,8 @@ export interface AppData {
   recipes: Recipe[];
   /** Step count per date (YYYY-MM-DD). */
   steps: Record<string, number>;
+  /** Water drunk per date, in ml. */
+  water: Record<string, number>;
+  /** One-off changes to the planned training load for a date. */
+  dayLoads: Record<string, DayLoad>;
 }

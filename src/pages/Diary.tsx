@@ -6,8 +6,9 @@ import { Sheet } from '../components/Sheet';
 import { addDays, formatDay, todayISO } from '../lib/dates';
 import { entryNutrients, sumNutrients } from '../lib/nutrition';
 import { newId, useStore } from '../lib/store';
-import { burnForDate, computePlan } from '../lib/targets';
-import { MEALS, type DiaryEntry, type Meal } from '../lib/types';
+import { DAY_LOADS, LOAD_ORDER } from '../lib/carbPlan';
+import { burnForDate, computePlan, targetsForDate } from '../lib/targets';
+import { MEALS, type DayLoad, type DiaryEntry, type Meal } from '../lib/types';
 import { formatWeight, kgToUnit, lbToKg, stLbToKg } from '../lib/units';
 
 const EXERCISES: { name: string; met: number }[] = [
@@ -41,7 +42,8 @@ export function Diary() {
   const weighIn = data.weights.find((w) => w.date === date);
   if (!plan || !data.profile) return null;
   const unit = data.profile.weightUnit;
-  const budget = plan.targets.kcal + (data.profile.eatBackExercise ? burned : 0);
+  const targets = targetsForDate(data, plan, date);
+  const budget = targets.kcal + (data.profile.eatBackExercise ? burned : 0);
   const remaining = budget - totals.kcal;
 
   return (
@@ -52,20 +54,30 @@ export function Diary() {
         <button className="icon-btn" aria-label="Next day" onClick={() => setDate(addDays(date, 1))}>›</button>
       </div>
 
+      {data.profile.carbCycling && (
+        <TrainingDayCard
+          load={targets.load}
+          overridden={date in data.dayLoads}
+          carbs={targets.carbs}
+          carbsPerKg={targets.carbs / plan.currentKg}
+          onChange={(l) => store.setDayLoad(date, l)}
+        />
+      )}
+
       <div className="card">
         <h2>
           Calories remaining <small>{plan.expenditure.confidence > 0 ? 'adaptive target' : 'formula target'}</small>
         </h2>
         <div className="summary">
-          <div><b>{Math.round(plan.targets.kcal)}</b><span>Target</span></div>
-          <div><b>−{Math.round(totals.kcal)}</b><span>Food</span></div>
+          <div><b>{Math.round(targets.kcal)}</b><span>Target</span></div>
+          <div><b>{Math.round(totals.kcal) > 0 ? '−' : ''}{Math.round(totals.kcal)}</b><span>Food</span></div>
           <div><b>{data.profile.eatBackExercise ? '+' : ''}{Math.round(burned)}</b><span>Exercise{data.profile.eatBackExercise ? '' : ' (not added)'}</span></div>
           <div><b style={{ color: remaining < 0 ? 'var(--bad)' : 'var(--good)' }}>{Math.round(remaining)}</b><span>Remaining</span></div>
         </div>
         <div className="bar" style={{ marginTop: 12 }}>
           <i style={{ width: `${Math.min(100, (totals.kcal / budget) * 100)}%`, background: remaining < 0 ? 'var(--bad)' : 'var(--accent)' }} />
         </div>
-        <MacroBars totals={totals} targets={plan.targets} />
+        <MacroBars totals={totals} targets={targets} />
         <div className="row between faint" style={{ marginTop: 10 }}>
           <span>Sugars {totals.sugars.toFixed(0)} g · Fibre {totals.fibre.toFixed(0)} g · Salt {totals.salt.toFixed(1)} g</span>
         </div>
@@ -114,6 +126,8 @@ export function Diary() {
           </div>
         ))}
       </div>
+
+      <WaterCard ml={data.water[date] ?? 0} goal={data.profile.waterGoalMl} onAdd={(ml) => store.addWater(date, ml)} />
 
       <div className="card">
         <div className="meal-head">
@@ -206,6 +220,68 @@ export function Diary() {
         />
       )}
     </>
+  );
+}
+
+function TrainingDayCard(props: { load: DayLoad; overridden: boolean; carbs: number; carbsPerKg: number; onChange: (l: DayLoad | null) => void }) {
+  const info = DAY_LOADS[props.load];
+  return (
+    <div className="card">
+      <div className="row between">
+        <div>
+          <strong>Training today</strong>
+          <div className="faint">
+            Carbs {Math.round(props.carbs)} g ({props.carbsPerKg.toFixed(1)} g/kg){props.overridden ? ' · changed for today' : ''}
+          </div>
+        </div>
+        <select
+          aria-label="Training load for this day"
+          style={{ width: 'auto' }}
+          value={props.load}
+          onChange={(e) => props.onChange(e.target.value as DayLoad)}
+        >
+          {LOAD_ORDER.map((l) => <option key={l} value={l}>{DAY_LOADS[l].label}</option>)}
+        </select>
+      </div>
+      <details style={{ marginTop: 8 }}>
+        <summary className="faint" style={{ cursor: 'pointer' }}>How to fuel today</summary>
+        <ul style={{ margin: '6px 0 0', paddingLeft: 18, fontSize: 14 }}>
+          {info.fuel.map((t) => <li key={t}>{t}</li>)}
+        </ul>
+      </details>
+      {props.overridden && (
+        <button className="btn ghost small" style={{ marginTop: 6, paddingLeft: 0 }} onClick={() => props.onChange(null)}>Reset to weekly plan</button>
+      )}
+    </div>
+  );
+}
+
+const DRINKS = [
+  { label: 'Glass', ml: 250 },
+  { label: 'Bottle', ml: 500 },
+  { label: 'Pint', ml: 568 },
+];
+
+function WaterCard({ ml, goal, onAdd }: { ml: number; goal: number; onAdd: (ml: number) => void }) {
+  const pct = Math.min(100, (ml / Math.max(1, goal)) * 100);
+  return (
+    <div className="card">
+      <div className="meal-head">
+        <h2 style={{ margin: 0 }}>Water</h2>
+        <span className="num muted">
+          {(ml / 1000).toFixed(2)} / {(goal / 1000).toFixed(1)} L · {Math.round(ml / 250)} glasses
+        </span>
+      </div>
+      <div className="bar" style={{ marginTop: 8 }}>
+        <i style={{ width: `${pct}%`, background: ml >= goal ? 'var(--good)' : 'var(--accent)' }} />
+      </div>
+      <div className="row" style={{ marginTop: 10, flexWrap: 'wrap' }}>
+        {DRINKS.map((d) => (
+          <button key={d.label} className="btn small" onClick={() => onAdd(d.ml)}>+ {d.label} <span className="faint">{d.ml} ml</span></button>
+        ))}
+        <button className="btn small" aria-label="Remove 250 ml" disabled={ml <= 0} onClick={() => onAdd(-250)}>−250</button>
+      </div>
+    </div>
   );
 }
 

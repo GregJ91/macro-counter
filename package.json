@@ -9,7 +9,8 @@
     "preview": "vite preview",
     "test": "vitest run",
     "typecheck": "tsc -b --noEmit",
-    "import:cofid": "node scripts/import-cofid.mjs"
+    "import:cofid": "node scripts/import-cofid.mjs",
+    "fetch:uk-foods": "node scripts/fetch-uk-foods.mjs"
   },
   "dependencies": {
     "@zxing/browser": "^0.1.5",
