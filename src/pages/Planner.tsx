@@ -1,7 +1,7 @@
 import { useMemo, useState, type ReactNode } from 'react';
 import { CartesianGrid, Line, LineChart, ReferenceLine, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts';
 import { addDays, formatShort, fromISO, todayISO } from '../lib/dates';
-import { ACTIVITY_FACTORS, KCAL_PER_KG, daysToGoal, minimumSafeIntake, projectWeight } from '../lib/nutrition';
+import { activityFactor, KCAL_PER_KG, KCAL_PER_STEP_PER_KG, LIFESTYLES, daysToGoal, minimumSafeIntake, projectWeight } from '../lib/nutrition';
 import { useStore } from '../lib/store';
 import { computePlan } from '../lib/targets';
 import { formatWeight, formatWeightDelta, kgToUnit } from '../lib/units';
@@ -16,18 +16,26 @@ export function Planner() {
   const [startKg, setStartKg] = useState(Math.round(baseKg * 10) / 10);
   const [intake, setIntake] = useState(Math.round((plan?.targets.kcal ?? 2000) / 10) * 10);
   const [burn, setBurn] = useState(0);
+  const baselineSteps = LIFESTYLES[profile.lifestyle].baselineSteps;
+  const [steps, setSteps] = useState(() => {
+    const recent = Object.entries(data.steps).filter(([d]) => d >= addDays(today, -14) && d < today);
+    return recent.length ? Math.round(recent.reduce((s, [, n]) => s + n, 0) / recent.length / 500) * 500 : baselineSteps;
+  });
   const [weeks, setWeeks] = useState(16);
 
   if (!plan) return null;
   const unit = profile.weightUnit;
-  const af = ACTIVITY_FACTORS[profile.activity].factor;
+  const af = activityFactor(profile);
   // Maintenance at the chosen starting weight (adjusting the estimate if the slider moved away from today's weight).
   const maintenance = plan.expenditure.tdee + 10 * af * (startKg - baseKg);
-  const dailyBalance = intake - (maintenance + burn);
+  // Your lifestyle setting already assumes `baselineSteps`; walking more or less than that shifts the burn.
+  const stepBurn = (steps - baselineSteps) * startKg * KCAL_PER_STEP_PER_KG;
+  const extraBurn = burn + stepBurn;
+  const dailyBalance = intake - (maintenance + extraBurn);
   const weeklyKg = (dailyBalance * 7) / KCAL_PER_KG;
-  const points = projectWeight({ startKg, intake, tdee: maintenance, extraBurn: burn, activityFactor: af, days: weeks * 7 });
+  const points = projectWeight({ startKg, intake, tdee: maintenance, extraBurn, activityFactor: af, days: weeks * 7 });
   const endKg = points[points.length - 1].kg;
-  const goalDay = profile.goalKg !== startKg ? daysToGoal(projectWeight({ startKg, intake, tdee: maintenance, extraBurn: burn, activityFactor: af, days: 3 * 365 }), startKg, profile.goalKg) : null;
+  const goalDay = profile.goalKg !== startKg ? daysToGoal(projectWeight({ startKg, intake, tdee: maintenance, extraBurn, activityFactor: af, days: 3 * 365 }), startKg, profile.goalKg) : null;
   const pctPerWeek = (Math.abs(weeklyKg) / startKg) * 100;
   const minIntake = minimumSafeIntake(profile.sex);
 
@@ -70,7 +78,13 @@ export function Planner() {
           'Extra calories burnt per day (exercise)',
           `${burn} kcal`,
           <input type="range" min={0} max={1500} step={25} value={burn} onChange={(e) => setBurn(Number(e.target.value))} />,
-          'On top of your normal activity level — e.g. a 5 km run ≈ 300 kcal',
+          'Beyond the workouts already in your profile — e.g. a 5 km run ≈ 300 kcal',
+        )}
+        {slider(
+          'Average steps per day',
+          `${steps.toLocaleString('en-GB')}`,
+          <input type="range" min={0} max={25000} step={500} value={steps} onChange={(e) => setSteps(Number(e.target.value))} />,
+          `Your lifestyle already assumes ~${baselineSteps.toLocaleString('en-GB')} steps · ${stepBurn >= 0 ? '+' : '−'}${Math.abs(Math.round(stepBurn))} kcal/day`,
         )}
         {slider(
           'Look ahead',
@@ -147,7 +161,7 @@ export function Planner() {
         >
           Use {intake} kcal/day as my plan
         </button>
-        {burn > 0 && <p className="faint">Your food target ignores the exercise slider — log workouts in the diary instead.</p>}
+        {(burn > 0 || Math.round(stepBurn) !== 0) && <p className="faint">Your food target ignores the exercise and step sliders — log workouts and steps in the diary instead.</p>}
       </div>
     </>
   );

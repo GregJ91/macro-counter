@@ -14,7 +14,7 @@ export interface Serving {
   grams: number;
 }
 
-export type FoodSource = 'uk-generic' | 'cofid' | 'open-food-facts' | 'custom';
+export type FoodSource = 'uk-generic' | 'cofid' | 'open-food-facts' | 'custom' | 'recipe';
 
 export interface Food {
   id: string;
@@ -54,13 +54,22 @@ export interface WeightEntry {
 
 export type Sex = 'male' | 'female';
 export type WeightUnit = 'kg' | 'st' | 'lb';
-export type ActivityLevel = 'sedentary' | 'light' | 'moderate' | 'very' | 'extreme';
+export type HeightUnit = 'cm' | 'ftin';
+/** Day-to-day movement outside of deliberate exercise. */
+export type Lifestyle = 'desk' | 'mixed' | 'feet' | 'manual';
+export type TrainingType = 'strength' | 'cardio' | 'mixed' | 'sport';
 
 export interface Profile {
+  name: string;
   sex: Sex;
   age: number;
   heightCm: number;
-  activity: ActivityLevel;
+  heightUnit: HeightUnit;
+  lifestyle: Lifestyle;
+  workoutsPerWeek: number;
+  workoutMinutes: number;
+  trainingType: TrainingType;
+  dailyStepGoal: number;
   weightUnit: WeightUnit;
   goalKg: number;
   /** Planned change per week in kg; negative = loss. */
@@ -73,6 +82,27 @@ export interface Profile {
   calorieOverride: number | null;
 }
 
+export interface MealItem {
+  food: Food;
+  grams: number;
+}
+
+/** A group of foods logged together, e.g. "My usual breakfast". */
+export interface SavedMeal {
+  id: string;
+  name: string;
+  items: MealItem[];
+}
+
+export interface Recipe {
+  id: string;
+  name: string;
+  servings: number;
+  /** Weight of the finished dish; null = sum of raw ingredient weights. */
+  cookedWeightG: number | null;
+  ingredients: MealItem[];
+}
+
 export interface AppData {
   version: 1;
   profile: Profile | null;
@@ -82,4 +112,8 @@ export interface AppData {
   customFoods: Food[];
   recentFoodIds: string[];
   recentFoods: Record<string, Food>;
+  savedMeals: SavedMeal[];
+  recipes: Recipe[];
+  /** Step count per date (YYYY-MM-DD). */
+  steps: Record<string, number>;
 }

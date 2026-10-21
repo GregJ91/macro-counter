@@ -1,16 +1,48 @@
 import { addDays, daysBetween } from './dates';
-import type { ActivityLevel, DiaryEntry, ExerciseEntry, Food, Nutrients, Profile, WeightEntry } from './types';
+import type { DiaryEntry, ExerciseEntry, Food, Lifestyle, MealItem, Nutrients, Profile, Recipe, TrainingType, WeightEntry } from './types';
 
 /** Approximate energy content of a kilogram of body-weight change (mixed fat/lean tissue). */
 export const KCAL_PER_KG = 7700;
 
-export const ACTIVITY_FACTORS: Record<ActivityLevel, { factor: number; label: string }> = {
-  sedentary: { factor: 1.2, label: 'Sedentary (desk job, little exercise)' },
-  light: { factor: 1.375, label: 'Lightly active (1–3 sessions/week)' },
-  moderate: { factor: 1.55, label: 'Moderately active (3–5 sessions/week)' },
-  very: { factor: 1.725, label: 'Very active (6–7 sessions/week)' },
-  extreme: { factor: 1.9, label: 'Extremely active (physical job + training)' },
+export const LIFESTYLES: Record<Lifestyle, { factor: number; baselineSteps: number; label: string; hint: string }> = {
+  desk: { factor: 1.2, baselineSteps: 4000, label: 'Mostly sitting', hint: 'Office or desk job, drive to work' },
+  mixed: { factor: 1.3, baselineSteps: 6500, label: 'Some walking', hint: 'Desk job but walk/commute on foot, school runs' },
+  feet: { factor: 1.4, baselineSteps: 9500, label: 'On my feet', hint: 'Retail, teaching, nursing, hospitality' },
+  manual: { factor: 1.55, baselineSteps: 12000, label: 'Physical work', hint: 'Trades, gardening, warehouse, farming' },
 };
+
+/** Added to the activity factor per weekly hour of training (≈ net kcal/h ÷ BMR ÷ 7). */
+export const TRAINING_TYPES: Record<TrainingType, { perWeeklyHour: number; label: string; proteinHint: string }> = {
+  strength: { perWeeklyHour: 0.025, label: 'Weights / strength', proteinHint: '1.6–2.2 g/kg' },
+  cardio: { perWeeklyHour: 0.04, label: 'Running / cycling / cardio', proteinHint: '1.4–1.8 g/kg' },
+  mixed: { perWeeklyHour: 0.033, label: 'Mix of both / classes', proteinHint: '1.6–2.0 g/kg' },
+  sport: { perWeeklyHour: 0.04, label: 'Team or racket sports', proteinHint: '1.4–1.8 g/kg' },
+};
+
+/** Overall activity multiplier from lifestyle plus planned training. */
+export function activityFactor(p: Pick<Profile, 'lifestyle' | 'workoutsPerWeek' | 'workoutMinutes' | 'trainingType'>): number {
+  const weeklyHours = (Math.max(0, p.workoutsPerWeek) * Math.max(0, p.workoutMinutes)) / 60;
+  return Math.min(2.0, LIFESTYLES[p.lifestyle].factor + weeklyHours * TRAINING_TYPES[p.trainingType].perWeeklyHour);
+}
+
+export function activityLabel(factor: number): string {
+  if (factor < 1.3) return 'Sedentary';
+  if (factor < 1.45) return 'Lightly active';
+  if (factor < 1.65) return 'Moderately active';
+  if (factor < 1.85) return 'Very active';
+  return 'Extremely active';
+}
+
+/** Net walking calories ≈ 0.0005 kcal per step per kg of body weight (~35 kcal per 1,000 steps at 70 kg). */
+export const KCAL_PER_STEP_PER_KG = 0.0005;
+
+/**
+ * Calories from steps above what your lifestyle already assumes. Can be negative on a
+ * lazy day, but only the positive part is credited to the daily budget.
+ */
+export function stepCalories(profile: Pick<Profile, 'lifestyle'>, steps: number, kg: number): number {
+  return (steps - LIFESTYLES[profile.lifestyle].baselineSteps) * kg * KCAL_PER_STEP_PER_KG;
+}
 
 export const ZERO_NUTRIENTS: Nutrients = { kcal: 0, protein: 0, carbs: 0, sugars: 0, fat: 0, satFat: 0, fibre: 0, salt: 0 };
 
@@ -21,7 +53,7 @@ export function bmr(profile: Pick<Profile, 'sex' | 'age' | 'heightCm'>, kg: numb
 }
 
 export function formulaTdee(profile: Profile, kg: number): number {
-  return bmr(profile, kg) * ACTIVITY_FACTORS[profile.activity].factor;
+  return bmr(profile, kg) * activityFactor(profile);
 }
 
 export function scaleNutrients(per100: Nutrients, grams: number): Nutrients {
@@ -217,6 +249,31 @@ export function daysToGoal(points: ProjectionPoint[], startKg: number, goalKg: n
   const losing = goalKg < startKg;
   const hit = points.find((p) => (losing ? p.kg <= goalKg : p.kg >= goalKg));
   return hit ? hit.day : null;
+}
+
+export function itemsNutrients(items: MealItem[]): Nutrients {
+  return sumNutrients(items.map((i) => scaleNutrients(i.food.per100, i.grams)));
+}
+
+/** Turn a recipe into a loggable food with per-100 g values and a per-serving portion. */
+export function recipeToFood(r: Recipe): Food {
+  const totals = itemsNutrients(r.ingredients);
+  const rawWeight = r.ingredients.reduce((s, i) => s + i.grams, 0);
+  const weight = r.cookedWeightG && r.cookedWeightG > 0 ? r.cookedWeightG : rawWeight;
+  const f = weight > 0 ? 100 / weight : 0;
+  const per100 = Object.fromEntries(Object.entries(totals).map(([k, v]) => [k, v * f])) as unknown as Nutrients;
+  const servings = Math.max(1, r.servings);
+  return {
+    id: `recipe:${r.id}`,
+    name: r.name,
+    source: 'recipe',
+    per100,
+    servings: [
+      { label: `1 serving (1/${servings} of recipe)`, grams: Math.round((weight / servings) * 10) / 10 },
+      { label: 'Whole recipe', grams: Math.round(weight) },
+      { label: '100 g', grams: 100 },
+    ],
+  };
 }
 
 export function foodServingDefault(food: Food): number {

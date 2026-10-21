@@ -1,4 +1,4 @@
-import { estimateExpenditure, calorieTargetForRate, macroTargets, weightTrend, type Targets, type ExpenditureEstimate } from './nutrition';
+import { estimateExpenditure, calorieTargetForRate, exerciseForDate, macroTargets, stepCalories, weightTrend, type Targets, type ExpenditureEstimate } from './nutrition';
 import type { AppData } from './types';
 
 export interface DayPlan {
@@ -16,4 +16,19 @@ export function computePlan(data: AppData, today: string): DayPlan | null {
   const expenditure = estimateExpenditure(p, data.diary, data.weights, today);
   const kcal = p.calorieOverride ?? Math.round(calorieTargetForRate(expenditure.tdee, p.rateKgPerWeek) / 10) * 10;
   return { currentKg, expenditure, targets: macroTargets(p, kcal, currentKg) };
+}
+
+export interface DayBurn {
+  workouts: number;
+  steps: number | null;
+  /** Calories from steps beyond your lifestyle baseline (never negative). */
+  stepKcal: number;
+  total: number;
+}
+
+export function burnForDate(data: AppData, date: string, kg: number): DayBurn {
+  const workouts = exerciseForDate(data.exercise, date);
+  const steps = data.steps[date] ?? null;
+  const stepKcal = steps !== null && data.profile ? Math.max(0, stepCalories(data.profile, steps, kg)) : 0;
+  return { workouts, steps, stepKcal, total: workouts + stepKcal };
 }

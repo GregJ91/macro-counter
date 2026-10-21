@@ -4,9 +4,9 @@ import { FoodDetail } from '../components/FoodDetail';
 import { MacroBars } from '../components/MacroBars';
 import { Sheet } from '../components/Sheet';
 import { addDays, formatDay, todayISO } from '../lib/dates';
-import { entryNutrients, exerciseForDate, sumNutrients } from '../lib/nutrition';
-import { useStore } from '../lib/store';
-import { computePlan } from '../lib/targets';
+import { entryNutrients, sumNutrients } from '../lib/nutrition';
+import { newId, useStore } from '../lib/store';
+import { burnForDate, computePlan } from '../lib/targets';
 import { MEALS, type DiaryEntry, type Meal } from '../lib/types';
 import { formatWeight, kgToUnit, lbToKg, stLbToKg } from '../lib/units';
 
@@ -30,11 +30,14 @@ export function Diary() {
   const [editing, setEditing] = useState<DiaryEntry | null>(null);
   const [exerciseOpen, setExerciseOpen] = useState(false);
   const [weighOpen, setWeighOpen] = useState(false);
+  const [stepsOpen, setStepsOpen] = useState(false);
+  const [savingMeal, setSavingMeal] = useState<Meal | null>(null);
 
   const plan = useMemo(() => computePlan(data, todayISO()), [data]);
   const entries = data.diary.filter((e) => e.date === date);
   const totals = sumNutrients(entries.map(entryNutrients));
-  const burned = exerciseForDate(data.exercise, date);
+  const burn = burnForDate(data, date, plan?.currentKg ?? 70);
+  const burned = burn.total;
   const weighIn = data.weights.find((w) => w.date === date);
   if (!plan || !data.profile) return null;
   const unit = data.profile.weightUnit;
@@ -77,6 +80,7 @@ export function Diary() {
               <h2 style={{ margin: 0, textTransform: 'capitalize' }}>{meal}</h2>
               <span className="row">
                 <span className="num muted">{Math.round(kcal)} kcal</span>
+                {list.length > 0 && <button className="btn ghost small" onClick={() => setSavingMeal(meal)}>Save meal</button>}
                 <button className="btn small" onClick={() => setAdding(meal)}>+ Add</button>
               </span>
             </div>
@@ -111,6 +115,26 @@ export function Diary() {
         ))}
       </div>
 
+      <div className="card">
+        <div className="meal-head">
+          <h2 style={{ margin: 0 }}>Steps</h2>
+          <button className="btn small" onClick={() => setStepsOpen(true)}>{burn.steps === null ? 'Log steps' : 'Edit'}</button>
+        </div>
+        {burn.steps === null ? (
+          <p className="faint" style={{ marginBottom: 0 }}>Goal {data.profile.dailyStepGoal.toLocaleString('en-GB')} steps — copy today’s total from your phone or watch.</p>
+        ) : (
+          <>
+            <div className="row between" style={{ marginTop: 8 }}>
+              <span className="num"><b>{burn.steps.toLocaleString('en-GB')}</b> <span className="muted">/ {data.profile.dailyStepGoal.toLocaleString('en-GB')}</span></span>
+              <span className="faint">{burn.stepKcal > 0 ? `+${Math.round(burn.stepKcal)} kcal extra burn` : 'within your lifestyle baseline'}</span>
+            </div>
+            <div className="bar" style={{ marginTop: 6 }}>
+              <i style={{ width: `${Math.min(100, (burn.steps / Math.max(1, data.profile.dailyStepGoal)) * 100)}%`, background: burn.steps >= data.profile.dailyStepGoal ? 'var(--good)' : 'var(--accent)' }} />
+            </div>
+          </>
+        )}
+      </div>
+
       <div className="card row between">
         <div>
           <strong>Weigh-in</strong>
@@ -119,6 +143,27 @@ export function Diary() {
         <button className="btn small" onClick={() => setWeighOpen(true)}>{weighIn ? 'Edit' : 'Log weight'}</button>
       </div>
 
+      {stepsOpen && (
+        <StepsSheet
+          initial={burn.steps}
+          onClose={() => setStepsOpen(false)}
+          onSave={(n) => {
+            store.setSteps(date, n);
+            setStepsOpen(false);
+          }}
+        />
+      )}
+      {savingMeal && (
+        <SaveMealSheet
+          defaultName={`My ${savingMeal}`}
+          count={entries.filter((e) => e.meal === savingMeal).length}
+          onClose={() => setSavingMeal(null)}
+          onSave={(name) => {
+            store.saveMeal({ id: newId(), name, items: entries.filter((e) => e.meal === savingMeal).map((e) => ({ food: e.food, grams: e.grams })) });
+            setSavingMeal(null);
+          }}
+        />
+      )}
       {adding && <AddFood date={date} meal={adding} onClose={() => setAdding(null)} />}
       {editing && (
         <Sheet title="Edit entry" onClose={() => setEditing(null)}>
@@ -161,6 +206,29 @@ export function Diary() {
         />
       )}
     </>
+  );
+}
+
+function StepsSheet({ initial, onClose, onSave }: { initial: number | null; onClose: () => void; onSave: (n: number | null) => void }) {
+  const [v, setV] = useState(initial === null ? '' : String(initial));
+  const n = parseInt(v, 10);
+  return (
+    <Sheet title="Log steps" onClose={onClose}>
+      <label className="field"><span>Steps today</span><input type="number" inputMode="numeric" autoFocus value={v} onChange={(e) => setV(e.target.value)} /></label>
+      <button className="btn primary block" disabled={!(n >= 0)} onClick={() => onSave(n)}>Save</button>
+      {initial !== null && <button className="btn ghost danger block" style={{ marginTop: 8 }} onClick={() => onSave(null)}>Clear steps</button>}
+    </Sheet>
+  );
+}
+
+function SaveMealSheet({ defaultName, count, onClose, onSave }: { defaultName: string; count: number; onClose: () => void; onSave: (name: string) => void }) {
+  const [name, setName] = useState(defaultName);
+  return (
+    <Sheet title="Save as meal" onClose={onClose}>
+      <p className="muted">Save these {count} foods so you can add them all in one tap next time.</p>
+      <label className="field"><span>Meal name</span><input type="text" autoFocus value={name} onChange={(e) => setName(e.target.value)} /></label>
+      <button className="btn primary block" disabled={!name.trim()} onClick={() => onSave(name.trim())}>Save meal</button>
+    </Sheet>
   );
 }
 

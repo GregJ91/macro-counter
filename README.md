@@ -16,8 +16,16 @@ All data is stored on the device (export/import a JSON backup from Settings).
   - **Open Food Facts** live search filtered to UK products, for branded supermarket items.
   - **Barcode scanner** (camera; native BarcodeDetector or ZXing fallback for iPhone).
   - Create your own foods from a label, and quick-add calories/macros.
+- **Saved meals** – tap “Save meal” on any diary meal (or build one in the Foods tab) and add the
+  whole lot in one go next time, scaled up or down.
+- **Recipes** – build a dish from ingredients, set servings and (optionally) the cooked weight, then
+  log it by the serving or by grams. Recipes show up in search.
+- **Profile** – height in ft/in or cm, daily lifestyle (sitting → physical work), workouts per week,
+  session length and training type. These set your activity factor and protein suggestion.
+- **Steps** – daily step goal and log; steps above what your lifestyle already assumes count as
+  extra burn (~0.0005 kcal per step per kg).
 - **Exercise logging** with MET-based estimates or manual calories from your watch; optionally
-  add exercise calories to your budget.
+  add exercise and step calories to your budget.
 - **Weight trend** – exponentially smoothed trend line so daily water swings don't mislead you.
   Units: stones & pounds, lb, or kg.
 - **Adaptive expenditure** – after ~1–3 weeks of logging, your real maintenance calories are
@@ -45,6 +53,8 @@ This writes `src/data/cofid.json`, which the app lazy-loads into search automati
 ## How the maths works
 
 - BMR: Mifflin–St Jeor; maintenance = BMR × activity factor until enough data exists.
+- Activity factor: lifestyle base (1.2 desk → 1.55 physical job) + weekly training hours ×
+  0.025–0.04 depending on training type, capped at 2.0.
 - Trend weight: EWMA (α = 0.1) over daily values, interpolating missing days.
 - Adaptive TDEE: `avg intake − Δtrend kg/day × 7,700`, blended with the formula estimate by
   confidence (logged days / 21).

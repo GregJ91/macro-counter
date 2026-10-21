@@ -1,58 +1,17 @@
 import { useMemo, useRef, useState } from 'react';
 import { todayISO } from '../lib/dates';
-import { ACTIVITY_FACTORS } from '../lib/nutrition';
-import { useStore } from '../lib/store';
+import { WeightInput } from '../components/MeasureInputs';
+import { DEFAULT_PROFILE, useStore } from '../lib/store';
 import { computePlan } from '../lib/targets';
-import type { ActivityLevel, AppData, Profile, WeightUnit } from '../lib/types';
-import { kgToUnit, lbToKg, stLbToKg } from '../lib/units';
+import type { AppData, Profile } from '../lib/types';
 
-const DEFAULT_PROFILE: Profile = {
-  sex: 'male',
-  age: 35,
-  heightCm: 175,
-  activity: 'light',
-  weightUnit: 'st',
-  goalKg: 75,
-  rateKgPerWeek: -0.5,
-  proteinGPerKg: 1.8,
-  fatPct: 30,
-  eatBackExercise: false,
-  calorieOverride: null,
-};
-
-/** Weight input that speaks the user's unit (stones & pounds, lb or kg) but stores kg. */
-function WeightInput({ kg, unit, onChange }: { kg: number; unit: WeightUnit; onChange: (kg: number) => void }) {
-  const lb = kgToUnit(kg, 'lb');
-  if (unit === 'st') {
-    const st = Math.floor(lb / 14);
-    return (
-      <div className="grid2">
-        <input type="number" inputMode="numeric" aria-label="stone" value={st} onChange={(e) => onChange(stLbToKg(Number(e.target.value) || 0, lb - st * 14))} />
-        <input type="number" inputMode="decimal" aria-label="pounds" value={Math.round((lb - st * 14) * 10) / 10} onChange={(e) => onChange(stLbToKg(st, Number(e.target.value) || 0))} />
-      </div>
-    );
-  }
-  return (
-    <input
-      type="number"
-      inputMode="decimal"
-      value={Math.round((unit === 'kg' ? kg : lb) * 10) / 10}
-      onChange={(e) => onChange(unit === 'kg' ? Number(e.target.value) : lbToKg(Number(e.target.value)))}
-    />
-  );
-}
-
-export function Settings({ onboarding = false, onDone }: { onboarding?: boolean; onDone?: () => void }) {
+export function Settings({ onboarding = false, onDone, onBack }: { onboarding?: boolean; onDone?: () => void; onBack?: () => void }) {
   const store = useStore();
   const { data } = store;
   const [p, setP] = useState<Profile>(data.profile ?? DEFAULT_PROFILE);
-  const [startKg, setStartKg] = useState(data.weights[data.weights.length - 1]?.kg ?? 85);
   const [saved, setSaved] = useState(false);
   const fileRef = useRef<HTMLInputElement>(null);
-  const preview = useMemo(
-    () => computePlan({ ...data, profile: p, weights: data.weights.length ? data.weights : [{ date: todayISO(), kg: startKg }] }, todayISO()),
-    [data, p, startKg],
-  );
+  const preview = useMemo(() => computePlan({ ...data, profile: p }, todayISO()), [data, p]);
 
   const set = <K extends keyof Profile>(k: K, v: Profile[K]) => {
     setSaved(false);
@@ -62,7 +21,6 @@ export function Settings({ onboarding = false, onDone }: { onboarding?: boolean;
 
   const save = () => {
     store.setProfile(p);
-    if (onboarding && data.weights.length === 0) store.setWeight({ date: todayISO(), kg: startKg });
     setSaved(true);
     onDone?.();
   };
@@ -91,38 +49,9 @@ export function Settings({ onboarding = false, onDone }: { onboarding?: boolean;
 
   return (
     <>
-      <div className="topbar"><h1>{onboarding ? 'Welcome — let’s set you up' : 'Settings'}</h1></div>
-
-      <div className="card">
-        <h2>About you</h2>
-        <div className="grid2">
-          <label className="field">
-            <span>Sex (for BMR formula)</span>
-            <select value={p.sex} onChange={(e) => set('sex', e.target.value as Profile['sex'])}>
-              <option value="male">Male</option>
-              <option value="female">Female</option>
-            </select>
-          </label>
-          <label className="field"><span>Age</span><input type="number" inputMode="numeric" value={p.age} onChange={(e) => set('age', Number(e.target.value))} /></label>
-          <label className="field"><span>Height (cm)</span><input type="number" inputMode="numeric" value={p.heightCm} onChange={(e) => set('heightCm', Number(e.target.value))} /></label>
-          <label className="field">
-            <span>Weight units</span>
-            <select value={p.weightUnit} onChange={(e) => set('weightUnit', e.target.value as WeightUnit)}>
-              <option value="st">Stones & pounds</option>
-              <option value="kg">Kilograms</option>
-              <option value="lb">Pounds</option>
-            </select>
-          </label>
-        </div>
-        {onboarding && data.weights.length === 0 && (
-          <label className="field"><span>Current weight {p.weightUnit === 'st' ? '(st, lb)' : `(${p.weightUnit})`}</span><WeightInput kg={startKg} unit={p.weightUnit} onChange={setStartKg} /></label>
-        )}
-        <label className="field">
-          <span>Activity level (excluding logged workouts)</span>
-          <select value={p.activity} onChange={(e) => set('activity', e.target.value as ActivityLevel)}>
-            {Object.entries(ACTIVITY_FACTORS).map(([k, v]) => <option key={k} value={k}>{v.label}</option>)}
-          </select>
-        </label>
+      <div className="topbar">
+        {onBack && <button className="btn ghost small" onClick={onBack}>← Profile</button>}
+        <h1 className="grow">{onboarding ? 'Your goal' : 'Goals & settings'}</h1>
       </div>
 
       <div className="card">

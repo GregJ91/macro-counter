@@ -7,6 +7,7 @@ const SOURCE_LABEL: Record<Food['source'], string> = {
   cofid: 'CoFID (UK gov)',
   'open-food-facts': 'Open Food Facts',
   custom: 'My food',
+  recipe: 'Recipe',
 };
 
 export function sourceLabel(f: Food): string {
@@ -21,6 +22,8 @@ export function FoodDetail(props: {
   confirmLabel: string;
   onConfirm: (grams: number, meal: Meal) => void;
   onDelete?: () => void;
+  /** Hide the meal picker, e.g. when adding a recipe ingredient. */
+  hideMeal?: boolean;
 }) {
   const { food } = props;
   const init = props.initialGrams ?? food.servings[0]?.grams ?? 100;
@@ -60,7 +63,7 @@ export function FoodDetail(props: {
           </select>
         </label>
       </div>
-      <label className="field">
+      {!props.hideMeal && <label className="field">
         <span>Meal</span>
         <select value={meal} onChange={(e) => setMeal(e.target.value as Meal)}>
           {MEALS.map((m) => (
@@ -69,7 +72,7 @@ export function FoodDetail(props: {
             </option>
           ))}
         </select>
-      </label>
+      </label>}
 
       <div className="card">
         <div className="row between">
