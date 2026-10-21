@@ -75,7 +75,7 @@ export function Foods() {
             <div key={f.id} className="entry" style={{ cursor: 'default' }}>
               <div className="grow">
                 <div className="name">{f.name}</div>
-                <div className="faint">{f.brand ? `${f.brand} · ` : ''}{Math.round(f.per100.kcal)} kcal/100g</div>
+                <div className="faint">{f.brand ? `${f.brand} · ` : ''}{Math.round(f.per100.kcal)} kcal/100g{f.correctedFrom ? ' · corrected' : ''}</div>
               </div>
               <button className="icon-btn" aria-label={`Delete ${f.name}`} onClick={() => confirm(`Delete “${f.name}”? Past diary entries keep their values.`) && removeCustomFood(f.id)}>✕</button>
             </div>

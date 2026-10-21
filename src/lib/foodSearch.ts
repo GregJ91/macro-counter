@@ -1,4 +1,5 @@
 import { UK_FOODS } from '../data/ukFoods';
+import { assess, sourceTier } from './foodQuality';
 import type { Food, Nutrients, Serving } from './types';
 
 // The full CoFID dataset is optional: it exists only after `npm run import:cofid`.
@@ -34,9 +35,14 @@ export async function searchLocal(query: string, extra: Food[] = []): Promise<Fo
   if (!words.length) return [];
   const pool = [...extra, ...UK_FOODS, ...(await loadCofid())];
   const seen = new Set<string>();
+  // A user's correction of a food replaces the original in results.
+  const corrected = new Set(extra.map((f) => f.correctedFrom).filter(Boolean));
   return pool
-    .map((f) => ({ f, s: score(`${f.brand ?? ''} ${f.name}`, words) }))
-    .filter(({ f, s }) => s > 0 && !seen.has(f.id) && seen.add(f.id))
+    // Each tier step is worth about half a matched word, so trusted sources win close calls
+    // without burying a much better name match.
+    .map((f) => ({ f, s: score(`${f.brand ?? ''} ${f.name}`, words), tier: sourceTier(f) }))
+    .filter(({ f, s }) => s > 0 && !corrected.has(f.id) && !seen.has(f.id) && seen.add(f.id))
+    .map(({ f, s, tier }) => ({ f, s: s + (3 - tier) }))
     .sort((a, b) => b.s - a.s)
     .slice(0, 40)
     .map(({ f }) => f);
@@ -45,7 +51,8 @@ export async function searchLocal(query: string, extra: Food[] = []): Promise<Fo
 // ---------- Open Food Facts (crowd-sourced, strong UK barcode coverage) ----------
 
 const OFF = 'https://world.openfoodfacts.org';
-const OFF_FIELDS = 'code,product_name,product_name_en,brands,nutriments,serving_size,serving_quantity,quantity';
+const OFF_FIELDS =
+  'code,product_name,product_name_en,brands,nutriments,serving_size,serving_quantity,quantity,categories_tags,image_nutrition_url,last_modified_t';
 
 interface OffProduct {
   code?: string;
@@ -55,6 +62,9 @@ interface OffProduct {
   serving_size?: string;
   serving_quantity?: number | string;
   nutriments?: Record<string, number | string | undefined>;
+  categories_tags?: string[];
+  image_nutrition_url?: string;
+  last_modified_t?: number;
 }
 
 function num(v: unknown): number {
@@ -79,6 +89,13 @@ export function offToFood(p: OffProduct): Food | null {
     fibre: num(n['fiber_100g']),
     salt: num(n['salt_100g']),
   };
+  const assessment = assess(per100, {
+    macrosPresent: ['proteins_100g', 'carbohydrates_100g', 'fat_100g'].every((k) => n[k] !== undefined && n[k] !== ''),
+    alcoholic: (p.categories_tags ?? []).some((t) => t.includes('alcoholic-beverages')) || num(n['alcohol_100g']) > 0.5,
+    hasLabelPhoto: !!p.image_nutrition_url,
+    lastModified: p.last_modified_t,
+  });
+  if (assessment.drop) return null;
   const servings: Serving[] = [];
   const sq = num(p.serving_quantity);
   if (sq > 0) servings.push({ label: p.serving_size ? `1 serving (${p.serving_size})` : '1 serving', grams: sq });
@@ -91,7 +108,13 @@ export function offToFood(p: OffProduct): Food | null {
     per100,
     servings,
     barcode: p.code,
+    quality: { issues: assessment.issues },
   };
+}
+
+/** Product page on Open Food Facts, where anyone can sign in and correct or add a product. */
+export function offProductUrl(barcode: string): string {
+  return `${OFF}/product/${encodeURIComponent(barcode)}`;
 }
 
 export async function searchOpenFoodFacts(query: string, signal?: AbortSignal): Promise<Food[]> {
@@ -110,10 +133,15 @@ export async function searchOpenFoodFacts(query: string, signal?: AbortSignal): 
   const res = await fetch(`${OFF}/cgi/search.pl?${params}`, { signal });
   if (!res.ok) throw new Error(`Open Food Facts search failed (${res.status})`);
   const data = (await res.json()) as { products?: OffProduct[] };
-  return (data.products ?? []).map(offToFood).filter((f): f is Food => !!f && f.per100.kcal > 0);
+  const foods = (data.products ?? []).map(offToFood).filter((f): f is Food => !!f);
+  // Stable sort keeps Open Food Facts' popularity order within each quality tier.
+  return foods.map((f, i) => ({ f, i, t: sourceTier(f) })).sort((a, b) => a.t - b.t || a.i - b.i).map(({ f }) => f);
 }
 
-export async function lookupBarcode(code: string): Promise<Food | null> {
+export async function lookupBarcode(code: string, ownFoods: Food[] = []): Promise<Food | null> {
+  // Your own entry (e.g. a corrected product) wins over the crowd-sourced one.
+  const own = ownFoods.find((f) => f.barcode === code);
+  if (own) return own;
   const res = await fetch(`${OFF}/api/v2/product/${encodeURIComponent(code)}.json?fields=${OFF_FIELDS}`);
   if (res.status === 404) return null;
   if (!res.ok) throw new Error(`Barcode lookup failed (${res.status})`);

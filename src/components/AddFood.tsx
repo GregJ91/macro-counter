@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { lookupBarcode, searchLocal, searchOpenFoodFacts } from '../lib/foodSearch';
+import { needsCheck } from '../lib/foodQuality';
+import { lookupBarcode, offProductUrl, searchLocal, searchOpenFoodFacts } from '../lib/foodSearch';
 import { newId, useStore } from '../lib/store';
 import { itemsNutrients, recipeToFood } from '../lib/nutrition';
 import type { Food, Meal, SavedMeal } from '../lib/types';
@@ -44,7 +45,7 @@ export function AddFood({ date, meal, onClose }: { date: string; meal: Meal; onC
         <button className="btn ghost small" onClick={() => setSelected(null)} style={{ marginBottom: 8 }}>
           ← Back
         </button>
-        <FoodDetail food={selected} meal={meal} confirmLabel="Add to diary" onConfirm={(g, m) => add(selected, g, m)} />
+        <FoodDetail key={selected.id} food={selected} meal={meal} confirmLabel="Add to diary" onConfirm={(g, m) => add(selected, g, m)} onCorrected={setSelected} />
       </Sheet>
     );
   }
@@ -84,7 +85,11 @@ export function AddFood({ date, meal, onClose }: { date: string; meal: Meal; onC
 /** Foods the user owns or used recently, for search and pickers. */
 export function useFoodPools() {
   const { data } = useStore();
-  const recent = useMemo(() => data.recentFoodIds.map((id) => data.recentFoods[id]).filter(Boolean), [data.recentFoodIds, data.recentFoods]);
+  const recent = useMemo(() => {
+    const fixes = new Map(data.customFoods.filter((f) => f.correctedFrom).map((f) => [f.correctedFrom!, f]));
+    const list = data.recentFoodIds.map((id) => fixes.get(id) ?? data.recentFoods[id]).filter(Boolean);
+    return list.filter((f, i) => list.findIndex((x) => x.id === f.id) === i);
+  }, [data.recentFoodIds, data.recentFoods, data.customFoods]);
   const recipeFoods = useMemo(() => data.recipes.map(recipeToFood), [data.recipes]);
   const searchPool = useMemo(() => [...recipeFoods, ...data.customFoods, ...recent], [recipeFoods, data.customFoods, recent]);
   return { recent, recipeFoods, searchPool };
@@ -155,7 +160,10 @@ export function FoodList({ foods, onPick }: { foods: Food[]; onPick: (f: Food) =
               {Math.round(f.per100.kcal)} kcal/100g · P {f.per100.protein.toFixed(1)} C {f.per100.carbs.toFixed(1)} F {f.per100.fat.toFixed(1)}
             </div>
           </div>
-          <span className="badge">{sourceLabel(f)}</span>
+          <span className="row" style={{ flexDirection: 'column', alignItems: 'flex-end', gap: 3 }}>
+            <span className="badge">{sourceLabel(f)}</span>
+            {needsCheck(f) && <span className="badge warn" title="Values may be wrong — check against the label">Check label</span>}
+          </span>
         </div>
       ))}
     </div>
@@ -168,6 +176,8 @@ export function SearchTab({ onPick, customFoods }: { onPick: (f: Food) => void; 
   const [online, setOnline] = useState<Food[]>([]);
   const [status, setStatus] = useState<'idle' | 'loading' | 'error'>('idle');
   const abortRef = useRef<AbortController | null>(null);
+  const ownBarcodes = useMemo(() => new Set(customFoods.filter((f) => f.source === 'custom' && f.barcode).map((f) => f.barcode!)), [customFoods]);
+  const correctedIds = useMemo(() => new Set(customFoods.map((f) => f.correctedFrom).filter(Boolean)), [customFoods]);
 
   useEffect(() => {
     let live = true;
@@ -217,7 +227,7 @@ export function SearchTab({ onPick, customFoods }: { onPick: (f: Food) => void; 
           </p>
           {status === 'error' && <p className="note warn">Couldn’t reach Open Food Facts. Check your connection.</p>}
           {status === 'idle' && online.length === 0 && <p className="faint">No branded matches.</p>}
-          <FoodList foods={online} onPick={onPick} />
+          <FoodList foods={online.filter((f) => !ownBarcodes.has(f.barcode ?? '') && !correctedIds.has(f.id))} onPick={onPick} />
         </>
       )}
     </div>
@@ -225,16 +235,18 @@ export function SearchTab({ onPick, customFoods }: { onPick: (f: Food) => void; 
 }
 
 export function ScanTab({ onPick }: { onPick: (f: Food) => void }) {
+  const { data } = useStore();
+  const ownFoods = data.customFoods;
   const [state, setState] = useState<{ kind: 'scanning' } | { kind: 'looking'; code: string } | { kind: 'missing'; code: string } | { kind: 'error'; msg: string }>({ kind: 'scanning' });
 
   const onDetected = useCallback(
     (code: string) => {
       setState({ kind: 'looking', code });
-      lookupBarcode(code)
+      lookupBarcode(code, ownFoods)
         .then((f) => (f ? onPick(f) : setState({ kind: 'missing', code })))
         .catch((e: Error) => setState({ kind: 'error', msg: e.message }));
     },
-    [onPick],
+    [onPick, ownFoods],
   );
 
   if (state.kind === 'scanning') return <BarcodeScanner onDetected={onDetected} />;
@@ -243,7 +255,10 @@ export function ScanTab({ onPick }: { onPick: (f: Food) => void }) {
       {state.kind === 'looking' && <p className="muted">Looking up {state.code}…</p>}
       {state.kind === 'missing' && (
         <div>
-          <p className="note warn">Barcode {state.code} isn’t in Open Food Facts yet. Create it from the label in the Create tab — it’ll be saved to your foods.</p>
+          <p className="note warn">
+            Barcode {state.code} isn’t in Open Food Facts yet. Enter it from the label below — it’ll be saved to your foods. You can also{' '}
+            <a href={offProductUrl(state.code)} target="_blank" rel="noreferrer">add it to Open Food Facts</a> so everyone gets it.
+          </p>
           <CreateFood barcode={state.code} onCreated={onPick} />
         </div>
       )}
@@ -268,24 +283,31 @@ const NUTRIENT_FIELDS = [
   ['salt', 'Salt (g)'],
 ] as const;
 
-export function CreateFood({ onCreated, barcode }: { onCreated: (f: Food) => void; barcode?: string }) {
+/** Create a food from a label — or, with `initial`, save a corrected copy of an existing food. */
+export function CreateFood({ onCreated, barcode, initial }: { onCreated: (f: Food) => void; barcode?: string; initial?: Food }) {
   const { saveCustomFood } = useStore();
-  const [name, setName] = useState('');
-  const [brand, setBrand] = useState('');
-  const [serving, setServing] = useState('');
-  const [vals, setVals] = useState<Record<string, string>>({});
+  const [name, setName] = useState(initial?.name ?? '');
+  const [brand, setBrand] = useState(initial?.brand ?? '');
+  const firstServing = initial?.servings.find((s) => s.label !== '100 g');
+  const [serving, setServing] = useState(firstServing ? String(firstServing.grams) : '');
+  const [vals, setVals] = useState<Record<string, string>>(
+    initial ? Object.fromEntries(NUTRIENT_FIELDS.map(([k]) => [k, String(Math.round(initial.per100[k] * 100) / 100)])) : {},
+  );
 
   const submit = () => {
     const per100 = Object.fromEntries(NUTRIENT_FIELDS.map(([k]) => [k, parseFloat(vals[k] ?? '') || 0])) as unknown as Food['per100'];
     const sg = parseFloat(serving);
+    // Corrections keep one stable id per original, so fixing twice overwrites rather than duplicates.
+    const original = initial?.correctedFrom ?? initial?.id;
     const food: Food = {
-      id: `custom:${newId()}`,
+      id: initial ? (initial.source === 'custom' ? initial.id : `custom:fix-${original}`) : `custom:${newId()}`,
       name: name.trim(),
       brand: brand.trim() || undefined,
       source: 'custom',
       per100,
-      servings: [...(sg > 0 ? [{ label: '1 serving', grams: sg }] : []), { label: '100 g', grams: 100 }],
-      barcode,
+      servings: [...(sg > 0 ? [{ label: firstServing?.label ?? '1 serving', grams: sg }] : []), { label: '100 g', grams: 100 }],
+      barcode: barcode ?? initial?.barcode,
+      correctedFrom: initial && initial.source !== 'custom' ? initial.id : initial?.correctedFrom,
     };
     saveCustomFood(food);
     onCreated(food);
@@ -293,7 +315,9 @@ export function CreateFood({ onCreated, barcode }: { onCreated: (f: Food) => voi
 
   return (
     <div>
-      <p className="faint">Enter values per 100 g from the label (UK labels list these by default).</p>
+      <p className="faint">
+        {initial ? 'Correct the values per 100 g from the label. Your version replaces this food in your search and scans.' : 'Enter values per 100 g from the label (UK labels list these by default).'}
+      </p>
       <label className="field"><span>Name</span><input type="text" value={name} onChange={(e) => setName(e.target.value)} /></label>
       <div className="grid2">
         <label className="field"><span>Brand (optional)</span><input type="text" value={brand} onChange={(e) => setBrand(e.target.value)} /></label>
@@ -308,7 +332,7 @@ export function CreateFood({ onCreated, barcode }: { onCreated: (f: Food) => voi
         ))}
       </div>
       <button className="btn primary block" style={{ marginTop: 14 }} disabled={!name.trim() || !vals.kcal} onClick={submit}>
-        Save food
+        {initial ? 'Save correction' : 'Save food'}
       </button>
     </div>
   );

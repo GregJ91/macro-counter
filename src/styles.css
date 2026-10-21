@@ -155,3 +155,4 @@ table.list td { padding: 7px 0; border-top: 1px solid var(--border); }
 table.list td:last-child { text-align: right; }
 .segmented.wrap { flex-wrap: wrap; }
 .segmented.wrap button { flex: 1 1 45%; }
+.badge.warn { background: color-mix(in srgb, var(--warn) 18%, transparent); color: var(--text); }

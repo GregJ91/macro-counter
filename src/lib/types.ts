@@ -16,6 +16,9 @@ export interface Serving {
 
 export type FoodSource = 'uk-generic' | 'cofid' | 'open-food-facts' | 'custom' | 'recipe';
 
+/** Data-quality concerns found in a crowd-sourced entry. */
+export type QualityIssue = 'energy-mismatch' | 'missing-macros' | 'no-label-photo' | 'stale';
+
 export interface Food {
   id: string;
   name: string;
@@ -25,6 +28,10 @@ export interface Food {
   per100: Nutrients;
   servings: Serving[];
   barcode?: string;
+  /** Present on crowd-sourced foods; empty issues = passed every check. */
+  quality?: { issues: QualityIssue[] };
+  /** Id of the food this is a user correction of (custom foods only). */
+  correctedFrom?: string;
 }
 
 export type Meal = 'breakfast' | 'lunch' | 'dinner' | 'snacks';

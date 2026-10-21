@@ -19,7 +19,7 @@ export function FoodPicker({ title, onPick, onClose, excludeId }: { title: strin
       {selected ? (
         <>
           <button className="btn ghost small" onClick={() => setSelected(null)} style={{ marginBottom: 8 }}>← Back</button>
-          <FoodDetail food={selected} meal="snacks" hideMeal confirmLabel="Add" onConfirm={(grams) => onPick(selected, grams)} />
+          <FoodDetail key={selected.id} food={selected} meal="snacks" hideMeal confirmLabel="Add" onConfirm={(grams) => onPick(selected, grams)} onCorrected={setSelected} />
         </>
       ) : (
         <>

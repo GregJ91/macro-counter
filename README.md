@@ -16,6 +16,13 @@ All data is stored on the device (export/import a JSON backup from Settings).
   - **Open Food Facts** live search filtered to UK products, for branded supermarket items.
   - **Barcode scanner** (camera; native BarcodeDetector or ZXing fallback for iPhone).
   - Create your own foods from a label, and quick-add calories/macros.
+  - **Quality filter for crowd-sourced data**: Open Food Facts entries with missing or impossible
+    values are dropped; entries whose calories don't match their macros (UK energy factors:
+    4/4/9 kcal/g, fibre 2), with missing macros, no label photo or not updated in 5 years are flagged.
+  - **Trusted-first ranking**: your foods & recipes → CoFID / built-in UK foods → clean Open Food
+    Facts → flagged entries ("Check label").
+  - **Fix this food**: save a corrected copy that replaces the original in search and barcode
+    scans, then open the product on Open Food Facts with your values copied, to fix it for everyone.
 - **Saved meals** – tap “Save meal” on any diary meal (or build one in the Foods tab) and add the
   whole lot in one go next time, scaled up or down.
 - **Recipes** – build a dish from ingredients, set servings and (optionally) the cooked weight, then
