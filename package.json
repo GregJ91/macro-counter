@@ -10,14 +10,18 @@
     "test": "vitest run",
     "typecheck": "tsc -b --noEmit",
     "import:cofid": "node scripts/import-cofid.mjs",
-    "fetch:uk-foods": "node scripts/fetch-uk-foods.mjs"
+    "fetch:uk-foods": "node scripts/fetch-uk-foods.mjs",
+    "predev": "node scripts/copy-ocr-assets.mjs",
+    "prebuild": "node scripts/copy-ocr-assets.mjs"
   },
   "dependencies": {
+    "@tesseract.js-data/eng": "^1.0.0",
     "@zxing/browser": "^0.1.5",
     "@zxing/library": "^0.21.3",
     "react": "^18.3.1",
     "react-dom": "^18.3.1",
-    "recharts": "^2.15.4"
+    "recharts": "^2.15.4",
+    "tesseract.js": "^7.0.0"
   },
   "devDependencies": {
     "@types/react": "^18.3.23",

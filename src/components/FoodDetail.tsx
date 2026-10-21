@@ -12,6 +12,7 @@ const SOURCE_LABEL: Record<Food['source'], string> = {
   'open-food-facts': 'Open Food Facts',
   custom: 'My food',
   recipe: 'Recipe',
+  restaurant: 'Official menu',
 };
 
 export function sourceLabel(f: Food): string {
@@ -95,7 +96,7 @@ export function FoodDetail(props: {
                 {s.label !== '100 g' ? ` (${s.grams} g)` : ''}
               </option>
             ))}
-            <option value={-1}>grams / ml</option>
+            {!food.portionOnly && <option value={-1}>grams / ml</option>}
           </select>
         </label>
       </div>
@@ -113,7 +114,7 @@ export function FoodDetail(props: {
       <div className="card">
         <div className="row between">
           <span className="big-stat">{Math.round(n.kcal)}</span>
-          <span className="muted">kcal · {Math.round(grams)} g</span>
+          <span className="muted">kcal · {food.portionOnly ? `${+(grams / 100).toFixed(2)} portion${grams === 100 ? '' : 's'}` : `${Math.round(grams)} g`}</span>
         </div>
         <div className="grid3" style={{ marginTop: 10 }}>
           <Macro label="Protein" value={n.protein} color="var(--protein)" />
@@ -129,7 +130,13 @@ export function FoodDetail(props: {
           </tbody>
         </table>
         <p className="faint" style={{ marginBottom: 0 }}>
-          Per 100 g: {Math.round(food.per100.kcal)} kcal · P {food.per100.protein} · C {food.per100.carbs} · F {food.per100.fat}
+          {food.portionOnly ? 'Per portion' : 'Per 100 g'}: {Math.round(food.per100.kcal)} kcal · P {+food.per100.protein.toFixed(1)} · C {+food.per100.carbs.toFixed(1)} · F {+food.per100.fat.toFixed(1)}
+          {food.sourceUrl && (
+            <>
+              {' · '}
+              <a href={food.sourceUrl} target="_blank" rel="noreferrer">source</a>
+            </>
+          )}
         </p>
       </div>
 

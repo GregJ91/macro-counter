@@ -14,7 +14,7 @@ export interface Serving {
   grams: number;
 }
 
-export type FoodSource = 'uk-generic' | 'cofid' | 'open-food-facts' | 'custom' | 'recipe';
+export type FoodSource = 'uk-generic' | 'cofid' | 'open-food-facts' | 'custom' | 'recipe' | 'restaurant';
 
 /** Data-quality concerns found in a crowd-sourced entry. */
 export type QualityIssue = 'energy-mismatch' | 'missing-macros' | 'no-label-photo' | 'stale';
@@ -32,6 +32,13 @@ export interface Food {
   quality?: { issues: QualityIssue[] };
   /** Id of the food this is a user correction of (custom foods only). */
   correctedFrom?: string;
+  /**
+   * Values are per portion, not per 100 g (restaurant items with no published weight).
+   * `per100` then holds per-portion values and the single serving is 100 "units".
+   */
+  portionOnly?: boolean;
+  /** Where the values came from, e.g. the chain's official product page. */
+  sourceUrl?: string;
 }
 
 export type Meal = 'breakfast' | 'lunch' | 'dinner' | 'snacks';

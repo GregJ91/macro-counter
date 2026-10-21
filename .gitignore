@@ -2,3 +2,5 @@ node_modules
 dist
 *.local
 data/raw
+public/ocr
+*.tsbuildinfo

@@ -16,6 +16,13 @@ All data is stored on the device (export/import a JSON backup from Settings).
   - **Open Food Facts** live search filtered to UK products, for branded supermarket items.
   - **Barcode scanner** (camera; native BarcodeDetector or ZXing fallback for iPhone).
   - Create your own foods from a label, and quick-add calories/macros.
+  - **Scan a nutrition label**: photograph the table and the values are read on-device
+    (Tesseract OCR, bundled into `public/ocr` at build time — no server, no CDN, nothing uploaded).
+    The UK-label parser fixes common OCR slips and cross-checks calories against the macros.
+    An unknown barcode goes straight to this, so the product works next time you scan it.
+  - **Eating out**: official per-portion nutrition for UK chains (Costa, Five Guys, Greggs, itsu,
+    KFC, LEON, PizzaExpress, Pret, Subway, Wagamama) in `src/data/chains/`, each item linked to its
+    official source and checked by a test (official domain, calories consistent with macros).
   - **Quality filter for crowd-sourced data**: Open Food Facts entries with missing or impossible
     values are dropped; entries whose calories don't match their macros (UK energy factors:
     4/4/9 kcal/g, fibre 2), with missing macros, no label photo or not updated in 5 years are flagged.

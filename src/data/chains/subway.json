@@ -1,0 +1,92 @@
+{
+ "chain": "Subway",
+ "slug": "subway",
+ "retrieved": "2026-10-21",
+ "extraction": "page",
+ "items": [
+  {
+   "name": "Chicken Tikka sub (185 g serving)",
+   "category": "Subs",
+   "portionG": 185,
+   "kcal": 302,
+   "protein": 26,
+   "carbs": 42,
+   "fat": 3.7,
+   "sugars": 6,
+   "satFat": 0.8,
+   "fibre": 3.5,
+   "salt": 1.2,
+   "url": "https://www.subway.com/en-gb/menu/product/4966/"
+  },
+  {
+   "name": "Turkey & Ham sub (192 g serving)",
+   "category": "Subs",
+   "portionG": 192,
+   "kcal": 327,
+   "protein": 23,
+   "carbs": 42,
+   "fat": 7.4,
+   "sugars": 6.3,
+   "satFat": 3,
+   "fibre": 2.9,
+   "salt": 2,
+   "url": "https://www.subway.com/en-gb/menu/product/4970/"
+  },
+  {
+   "name": "Honey Mustard BBQ sub (258 g serving)",
+   "category": "Subs",
+   "portionG": 258,
+   "kcal": 430,
+   "protein": 28,
+   "carbs": 44,
+   "fat": 15,
+   "sugars": 12,
+   "satFat": 5.7,
+   "fibre": 3.5,
+   "salt": 2.4,
+   "url": "https://www.subway.com/en-gb/menu/product/13447/"
+  },
+  {
+   "name": "Garlic Cheese Steak sub (272 g serving)",
+   "category": "Subs",
+   "portionG": 272,
+   "kcal": 539,
+   "protein": 24,
+   "carbs": 51,
+   "fat": 27,
+   "sugars": 12,
+   "satFat": 6.7,
+   "fibre": 4.1,
+   "salt": 2.1,
+   "url": "https://www.subway.com/en-gb/menu/product/12176/"
+  },
+  {
+   "name": "Shawarma Spiced Chicken sub (221 g serving)",
+   "category": "Subs",
+   "portionG": 221,
+   "kcal": 353,
+   "protein": 19,
+   "carbs": 44,
+   "fat": 12,
+   "sugars": null,
+   "satFat": null,
+   "fibre": null,
+   "salt": 2.6,
+   "url": "https://www.subway.com/en-gb/menu/product/15461/"
+  },
+  {
+   "name": "Pumpkin Spiced Cookie (1 cookie, 45 g)",
+   "category": "Cookies",
+   "portionG": 45,
+   "kcal": 194,
+   "protein": 2.3,
+   "carbs": 27,
+   "fat": 8.3,
+   "sugars": null,
+   "satFat": null,
+   "fibre": null,
+   "salt": null,
+   "url": "https://www.subway.com/en-gb/menu/product/15703/"
+  }
+ ]
+}

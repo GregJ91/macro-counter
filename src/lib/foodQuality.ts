@@ -57,7 +57,7 @@ export function assess(
  */
 export function sourceTier(f: Food): number {
   if (f.source === 'custom' || f.source === 'recipe') return 0;
-  if (f.source === 'cofid' || f.source === 'uk-generic') return 1;
+  if (f.source === 'cofid' || f.source === 'uk-generic' || f.source === 'restaurant') return 1;
   const serious = f.quality?.issues.some((i) => i === 'energy-mismatch' || i === 'missing-macros');
   return serious ? 3 : 2;
 }

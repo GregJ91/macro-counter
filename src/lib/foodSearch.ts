@@ -1,5 +1,6 @@
 import { UK_FOODS } from '../data/ukFoods';
 import { assess, sourceTier } from './foodQuality';
+import { RESTAURANT_FOODS } from './restaurants';
 import type { Food, Nutrients, Serving } from './types';
 
 // The full CoFID dataset is optional: it exists only after `npm run import:cofid`.
@@ -33,7 +34,7 @@ function score(name: string, words: string[]): number {
 export async function searchLocal(query: string, extra: Food[] = []): Promise<Food[]> {
   const words = normalise(query).split(' ').filter(Boolean);
   if (!words.length) return [];
-  const pool = [...extra, ...UK_FOODS, ...(await loadCofid())];
+  const pool = [...extra, ...UK_FOODS, ...RESTAURANT_FOODS, ...(await loadCofid())];
   const seen = new Set<string>();
   // A user's correction of a food replaces the original in results.
   const corrected = new Set(extra.map((f) => f.correctedFrom).filter(Boolean));

@@ -101,7 +101,7 @@ export function Diary() {
               <div key={e.id} className="entry" onClick={() => setEditing(e)}>
                 <div className="grow">
                   <div className="name">{e.food.name}</div>
-                  <div className="faint">{e.food.brand ? `${e.food.brand} · ` : ''}{e.food.id.startsWith('quick:') ? 'quick add' : `${Math.round(e.grams)} g`}</div>
+                  <div className="faint">{e.food.brand ? `${e.food.brand} · ` : ''}{e.food.id.startsWith('quick:') ? 'quick add' : e.food.portionOnly ? `${+(e.grams / 100).toFixed(2)} × portion` : `${Math.round(e.grams)} g`}</div>
                 </div>
                 <span className="kcal">{Math.round(entryNutrients(e).kcal)}</span>
               </div>
